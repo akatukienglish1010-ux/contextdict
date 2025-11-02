@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-# ── プロジェクト構成 ─────────────────────────────────────────────
+# ───── ディレクトリ作成 ─────
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/layout
 mkdir -p ContextDict/app/src/main/res/values
 
-# settings.gradle
+# ───── settings.gradle ─────
 cat > ContextDict/settings.gradle <<'EOF'
 pluginManagement {
     repositories { gradlePluginPortal(); google(); mavenCentral() }
@@ -19,12 +19,12 @@ rootProject.name = "ContextDict"
 include(":app")
 EOF
 
-# ルート build.gradle（空）
+# ───── ルート build.gradle（空でOK） ─────
 cat > ContextDict/build.gradle <<'EOF'
-// empty
+// root empty
 EOF
 
-# gradle.properties
+# ───── gradle.properties ─────
 cat > ContextDict/gradle.properties <<'EOF'
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 android.useAndroidX=true
@@ -32,7 +32,7 @@ android.enableJetifier=true
 kotlin.code.style=official
 EOF
 
-# app/build.gradle
+# ───── app/build.gradle ─────
 cat > ContextDict/app/build.gradle <<'EOF'
 plugins {
     id 'com.android.application' version '8.5.2'
@@ -59,12 +59,13 @@ android {
         debug { minifyEnabled false }
     }
 
+    buildFeatures { viewBinding true }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = '17' }
-    buildFeatures { viewBinding true }
 }
 
 dependencies {
@@ -74,12 +75,12 @@ dependencies {
 }
 EOF
 
-# proguard-rules.pro
+# ───── proguard-rules.pro ─────
 cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
 EOF
 
-# AndroidManifest.xml
+# ───── AndroidManifest.xml（INTERNET + テーマ + exported） ─────
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.contextdict">
@@ -91,6 +92,7 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
         android:allowBackup="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.ContextDict">
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -99,16 +101,20 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 </manifest>
 EOF
 
-# MainActivity.kt（★長押しで即検索／ダイアログ無し）
+# ───── MainActivity.kt（WebView + 選択メニューに「Dongriで検索」追加） ─────
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -119,6 +125,10 @@ import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
+
+    companion object {
+        private const val MENU_DONGRI = 1001
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -137,29 +147,63 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ★ 長押し→選択テキストを自動で Dongri に検索遷移（ダイアログ無し）
-        wv.setOnLongClickListener {
-            // 既定の選択UIも出したいので false を返す
-            wv.postDelayed({
-                wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { raw ->
+        // 選択ツールバーに「Dongriで検索」を追加
+        wv.setCustomSelectionActionModeCallback(object : ActionMode.Callback {
+            private fun ensureItem(menu: Menu) {
+                if (menu.findItem(MENU_DONGRI) == null) {
+                    menu.add(0, MENU_DONGRI, 0, "Dongriで検索")
+                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                }
+            }
+
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                ensureItem(menu); return true
+            }
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+                ensureItem(menu); return true
+            }
+            override fun onDestroyActionMode(mode: ActionMode) {}
+
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                if (item.itemId != MENU_DONGRI) return false
+
+                val js = """
+                    (function(){
+                      var s = window.getSelection().toString();
+                      if(!s){
+                        var el = document.activeElement;
+                        if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
+                          try {
+                            s = el.value.substring(el.selectionStart||0, el.selectionEnd||0);
+                          } catch(e){}
+                        }
+                      }
+                      return s;
+                    })();
+                """.trimIndent()
+
+                wv.evaluateJavascript(js) { raw ->
                     val selected = raw
-                        .trim('"')
-                        .replace("\\n", " ")
-                        .replace("\\t", " ")
-                        .replace("\u3000", " ")
-                        .trim()
+                        ?.trim('"')
+                        ?.replace("\\n", " ")
+                        ?.replace("\\t", " ")
+                        ?.replace("\\u3000", " ")
+                        ?.replace("\\\"", "\"")
+                        ?.trim()
+                        ?: ""
+
                     if (selected.isNotBlank()) {
-                        // Dongri 形式: /search/all/<TEXT>/HEADWORD/STARTWITH
                         val enc = URLEncoder.encode(selected, "UTF-8").replace("+", "%20")
                         val url = "https://home.east-education.jp/dongri/search/all/$enc/HEADWORD/STARTWITH"
                         wv.loadUrl(url)
                     }
+                    mode.finish()
                 }
-            }, 50)
-            false
-        }
+                return true
+            }
+        })
 
-        // 起動時に開くページ（必要なら strings.xml で変更）
+        // 起動ページ（必要なら strings.xml の start_url を変更）
         wv.loadUrl(getString(R.string.start_url))
     }
 
@@ -173,7 +217,7 @@ class MainActivity : AppCompatActivity() {
 }
 EOF
 
-# layout
+# ───── レイアウト（WebView＋中央にローディング） ─────
 cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -195,20 +239,20 @@ cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 </FrameLayout>
 EOF
 
-# strings.xml（起動ページはお好みで変更OK）
+# ───── 文字列リソース（起動URL） ─────
 cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
     <string name="app_name">ContextDict</string>
-    <!-- 起動URL。最初からDongriを開きたい場合は下行をDongriトップ等に変えてください。 -->
+    <!-- 起動時のページ（お好みで変更可） -->
     <string name="start_url">https://ejje.weblio.jp/</string>
 </resources>
 EOF
 
-# themes.xml
+# ───── テーマ（AppCompat 用） ─────
 cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources>
     <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 EOF
 
-echo "Project generated (long-press => Dongri search, no dialog)."
+echo "Project generated (WebView + context menu 'Dongriで検索')."
