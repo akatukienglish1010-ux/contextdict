@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-# ディレクトリ
+# ── プロジェクト構成 ─────────────────────────────────────────────
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/layout
 mkdir -p ContextDict/app/src/main/res/values
 
-################################
 # settings.gradle
-################################
 cat > ContextDict/settings.gradle <<'EOF'
 pluginManagement {
     repositories { gradlePluginPortal(); google(); mavenCentral() }
@@ -21,16 +19,12 @@ rootProject.name = "ContextDict"
 include(":app")
 EOF
 
-################################
-# ルート build.gradle（空でOK）
-################################
+# ルート build.gradle（空）
 cat > ContextDict/build.gradle <<'EOF'
-// root empty
+// empty
 EOF
 
-################################
 # gradle.properties
-################################
 cat > ContextDict/gradle.properties <<'EOF'
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 android.useAndroidX=true
@@ -38,9 +32,7 @@ android.enableJetifier=true
 kotlin.code.style=official
 EOF
 
-################################
 # app/build.gradle
-################################
 cat > ContextDict/app/build.gradle <<'EOF'
 plugins {
     id 'com.android.application' version '8.5.2'
@@ -82,19 +74,12 @@ dependencies {
 }
 EOF
 
-################################
 # proguard-rules.pro
-################################
 cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
 EOF
 
-################################
 # AndroidManifest.xml
-# ※ INTERNET 権限追加
-# ※ テーマ指定はそのまま
-# ※ HTTPのみのサイトを開く必要があれば application に android:usesCleartextTraffic="true" を追加してください
-################################
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.contextdict">
@@ -106,7 +91,6 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
         android:allowBackup="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.ContextDict">
-
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -115,14 +99,11 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
     </application>
 </manifest>
 EOF
 
-################################
-# MainActivity.kt（WebView版、戻るボタン対応、進捗表示）
-################################
+# MainActivity.kt（★長押しで即検索／ダイアログ無し）
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
@@ -134,6 +115,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import com.example.contextdict.databinding.ActivityMainBinding
+import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -147,16 +129,38 @@ class MainActivity : AppCompatActivity() {
         val wv = binding.webview
         wv.settings.javaScriptEnabled = true
         wv.settings.domStorageEnabled = true
-        wv.webViewClient = WebViewClient() // アプリ内で遷移
+        wv.webViewClient = WebViewClient()
         wv.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                binding.progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
+                binding.progressBar.visibility =
+                    if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
         }
 
-        // 起動URL（strings.xmlで変更できます）
-        val startUrl = getString(R.string.start_url)
-        wv.loadUrl(startUrl)
+        // ★ 長押し→選択テキストを自動で Dongri に検索遷移（ダイアログ無し）
+        wv.setOnLongClickListener {
+            // 既定の選択UIも出したいので false を返す
+            wv.postDelayed({
+                wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { raw ->
+                    val selected = raw
+                        .trim('"')
+                        .replace("\\n", " ")
+                        .replace("\\t", " ")
+                        .replace("\u3000", " ")
+                        .trim()
+                    if (selected.isNotBlank()) {
+                        // Dongri 形式: /search/all/<TEXT>/HEADWORD/STARTWITH
+                        val enc = URLEncoder.encode(selected, "UTF-8").replace("+", "%20")
+                        val url = "https://home.east-education.jp/dongri/search/all/$enc/HEADWORD/STARTWITH"
+                        wv.loadUrl(url)
+                    }
+                }
+            }, 50)
+            false
+        }
+
+        // 起動時に開くページ（必要なら strings.xml で変更）
+        wv.loadUrl(getString(R.string.start_url))
     }
 
     override fun onBackPressed() {
@@ -169,9 +173,7 @@ class MainActivity : AppCompatActivity() {
 }
 EOF
 
-################################
-# res/layout/activity_main.xml（WebView + progress）
-################################
+# layout
 cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -193,24 +195,20 @@ cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 </FrameLayout>
 EOF
 
-################################
-# res/values/strings.xml（起動URLをここで管理）
-################################
+# strings.xml（起動ページはお好みで変更OK）
 cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
     <string name="app_name">ContextDict</string>
-    <!-- 起動時に開くURL。必要ならここを好きな辞書サイトに変更 -->
+    <!-- 起動URL。最初からDongriを開きたい場合は下行をDongriトップ等に変えてください。 -->
     <string name="start_url">https://ejje.weblio.jp/</string>
 </resources>
 EOF
 
-################################
-# res/values/themes.xml（テーマ）
-################################
+# themes.xml
 cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources>
     <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 EOF
 
-echo "Project generated (WebView version)."
+echo "Project generated (long-press => Dongri search, no dialog)."
