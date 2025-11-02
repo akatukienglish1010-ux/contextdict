@@ -9,36 +9,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate minimal project
+      - name: Write generator script
         shell: bash
         run: |
-          bash gen.sh
+          cat > gen.sh <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          # （↑ここから下に、上で貼った gen.sh の中身をそのままコピペ）
+          SCRIPT
+          chmod +x gen.sh
+
+      - name: Generate project files
+        run: ./gen.sh
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install SDK packages
+      - name: Install SDK components
         run: |
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-          yes | sdkmanager --licenses
 
-      - name: Set up Gradle 8.7
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.7'
 
       - name: Build Debug APK (verbose)
-        run: |
-          gradle -p ContextDict :app:assembleDebug --no-daemon --stacktrace
+        run: gradle -p ContextDict :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ContextDict-APK
-          path: ContextDict/app/build/outputs/apk/debug/app-debug.apk
+          name: ContextDict-debug-apk
+          path: ContextDict/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
