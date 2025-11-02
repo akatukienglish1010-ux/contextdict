@@ -1,0 +1,293 @@
+name: Build APK (ContextDict)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # プロジェクト一式を生成
+      - name: Create project files
+        run: |
+          set -e
+          mkdir -p ContextDict/app/src/main/java/com/example/contextdict
+          mkdir -p ContextDict/app/src/main/res/values
+          mkdir -p ContextDict/app/src/main/res/layout
+          # --- ここから各ファイルを作成（長いので折りたたみ） ---
+          cat > ContextDict/settings.gradle <<'EOF'
+pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories { google(); mavenCentral() }
+}
+rootProject.name = "ContextDict"
+include(":app")
+EOF
+          cat > ContextDict/build.gradle <<'EOF'
+buildscript { repositories { google(); mavenCentral() } }
+plugins { id 'com.android.application' version '8.5.2' apply false; id 'org.jetbrains.kotlin.android' version '1.9.24' apply false }
+EOF
+          cat > ContextDict/app/build.gradle <<'EOF'
+plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+android {
+  namespace 'com.example.contextdict'; compileSdk 34
+  defaultConfig { applicationId "com.example.contextdict"; minSdk 23; targetSdk 34; versionCode 1; versionName "1.0"; vectorDrawables { useSupportLibrary true } }
+  buildTypes { release { minifyEnabled false; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' } debug { minifyEnabled false } }
+  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+  kotlinOptions { jvmTarget = '17' }
+  buildFeatures { viewBinding true }
+}
+dependencies {
+  implementation 'androidx.core:core-ktx:1.13.1'
+  implementation 'androidx.appcompat:appcompat:1.7.0'
+  implementation 'com.google.android.material:material:1.12.0'
+  implementation 'androidx.browser:browser:1.8.0'
+}
+EOF
+          cat > ContextDict/app/proguard-rules.pro <<'EOF'
+# no rules
+EOF
+          cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.contextdict">
+  <application android:allowBackup="true" android:label="@string/app_name" android:supportsRtl="true" android:theme="@style/Theme.ContextDict">
+    <activity android:name=".ProcessTextActivity" android:exported="true" android:label="@string/action_lookup_label">
+      <intent-filter>
+        <action android:name="android.intent.action.PROCESS_TEXT" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+      </intent-filter>
+    </activity>
+    <activity android:name=".EditDictionariesActivity" android:exported="false" android:label="@string/title_manage_dicts" />
+  </application>
+</manifest>
+EOF
+          cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
+<resources>
+  <string name="app_name">ContextDict</string>
+  <string name="action_lookup_label">辞書で検索…</string>
+  <string name="title_manage_dicts">辞書を管理</string>
+  <string name="btn_add">追加</string>
+  <string name="hint_name">表示名（例: Weblio）</string>
+  <string name="hint_template">URLテンプレート（%s が語）</string>
+  <string name="msg_invalid_template">URLテンプレートに %s を含めてください</string>
+  <string name="msg_no_dicts">最初に辞書を追加してください（右上の＋）</string>
+  <string name="menu_reset">初期辞書に戻す</string>
+  <string name="menu_set_default">既定にする</string>
+  <string name="menu_unset_default">既定を解除</string>
+  <string name="menu_delete">削除</string>
+  <string name="dialog_title_choose">辞書を選択</string>
+  <string name="dialog_manage">管理…</string>
+</resources>
+EOF
+          cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
+<resources xmlns:tools="http://schemas.android.com/tools">
+  <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar">
+    <item name="android:windowBackground">?android:colorBackground</item>
+  </style>
+</resources>
+EOF
+          cat > ContextDict/app/src/main/res/layout/activity_edit_dictionaries.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="16dp">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+    <EditText android:id="@+id/nameInput" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="@string/hint_name" android:inputType="textCapWords"/>
+    <Button android:id="@+id/addButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/btn_add" android:layout_marginStart="8dp"/>
+  </LinearLayout>
+  <EditText android:id="@+id/templateInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/hint_template" android:inputType="textUri" android:layout_marginTop="8dp"/>
+  <TextView android:id="@+id/emptyMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/msg_no_dicts" android:paddingTop="16dp" android:visibility="gone"/>
+  <ListView android:id="@+id/listView" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:dividerHeight="1dp"/>
+</LinearLayout>
+EOF
+          cat > ContextDict/app/src/main/res/layout/row_dictionary.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:orientation="vertical">
+  <TextView android:id="@+id/name" android:layout_width="match_parent" android:layout_height="wrap_content" android:textStyle="bold" android:textSize="16sp"/>
+  <TextView android:id="@+id/template" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp"/>
+</LinearLayout>
+EOF
+          cat > ContextDict/app/src/main/java/com/example/contextdict/ProcessTextActivity.kt <<'EOF'
+package com.example.contextdict
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
+import java.net.URLEncoder
+class ProcessTextActivity : AppCompatActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim().orEmpty()
+    val store = DictionaryStore(this)
+    val dicts = store.load()
+    if (dicts.isEmpty()) { store.resetToDefaults() }
+    val finalDicts = store.load()
+    val defaultId = store.getDefaultId()
+    val defaultDict = finalDicts.firstOrNull { it.id == defaultId }
+    if (!text.isBlank() && defaultDict != null) { openDictionary(defaultDict, text); finish(); return }
+    val names = finalDicts.map { it.name } + getString(R.string.dialog_manage)
+    AlertDialog.Builder(this)
+      .setTitle(R.string.dialog_title_choose)
+      .setItems(names.toTypedArray()) { _, which ->
+        if (which == finalDicts.size) startActivity(Intent(this, EditDictionariesActivity::class.java))
+        else openDictionary(finalDicts[which], text)
+        finish()
+      }
+      .setOnCancelListener { finish() }.show()
+  }
+  private fun openDictionary(dict: UserDictionary, text: String) {
+    val encoded = URLEncoder.encode(text.ifBlank { "" }, "UTF-8")
+    val url = dict.template.replace("%s", encoded)
+    CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(url))
+  }
+}
+EOF
+          cat > ContextDict/app/src/main/java/com/example/contextdict/EditDictionariesActivity.kt <<'EOF'
+package com.example.contextdict
+import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+class EditDictionariesActivity : AppCompatActivity() {
+  private lateinit var store: DictionaryStore
+  private lateinit var listView: ListView
+  private lateinit var emptyMessage: TextView
+  private lateinit var nameInput: EditText
+  private lateinit var templateInput: EditText
+  private lateinit var addButton: Button
+  private lateinit var adapter: DictionaryAdapter
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    setContentView(R.layout.activity_edit_dictionaries)
+    supportActionBar?.setDisplayHomeAsUpEnabled(true)
+    store = DictionaryStore(this)
+    listView = findViewById(R.id.listView)
+    emptyMessage = findViewById(R.id.emptyMessage)
+    nameInput = findViewById(R.id.nameInput)
+    templateInput = findViewById(R.id.templateInput)
+    addButton = findViewById(R.id.addButton)
+    adapter = DictionaryAdapter(this, store.load().toMutableList())
+    listView.adapter = adapter
+    refreshEmpty()
+    addButton.setOnClickListener {
+      val name = nameInput.text.toString().trim()
+      val template = templateInput.text.toString().trim()
+      if (name.isBlank() || template.isBlank() || !template.contains("%s")) {
+        Toast.makeText(this, getString(R.string.msg_invalid_template, "%s"), Toast.LENGTH_SHORT).show(); return@setOnClickListener
+      }
+      val dict = UserDictionary.new(name, template)
+      adapter.add(dict); adapter.notifyDataSetChanged(); store.save(adapter.items)
+      nameInput.setText(""); templateInput.setText(""); refreshEmpty()
+    }
+    listView.setOnItemClickListener { _, _, position, _ ->
+      val dict = adapter.getItem(position)!!
+      val menu = PopupMenu(this, listView.getChildAt(position))
+      menu.menu.add(0,1,0,getString(R.string.menu_set_default))
+      menu.menu.add(0,2,1,getString(R.string.menu_unset_default))
+      menu.menu.add(0,3,2,getString(R.string.menu_delete))
+      menu.setOnMenuItemClickListener {
+        when(it.itemId){ 1->store.setDefaultId(dict.id); 2->store.setDefaultId(null); 3->{ adapter.items.removeAt(position); adapter.notifyDataSetChanged(); store.save(adapter.items); refreshEmpty() } }
+        true
+      }
+      menu.show()
+    }
+  }
+  private fun refreshEmpty(){ emptyMessage.visibility = if (adapter.count==0) android.view.View.VISIBLE else android.view.View.GONE }
+  override fun onCreateOptionsMenu(menu: Menu): Boolean { menu.add(0,100,0,getString(R.string.menu_reset)); return true }
+  override fun onOptionsItemSelected(item: MenuItem): Boolean = when(item.itemId){
+    android.R.id.home -> { finish(); true }
+    100 -> { store.resetToDefaults(); adapter.items.clear(); adapter.items.addAll(store.load()); adapter.notifyDataSetChanged(); refreshEmpty(); true }
+    else -> super.onOptionsItemSelected(item)
+  }
+}
+EOF
+          cat > ContextDict/app/src/main/java/com/example/contextdict/DictionaryStore.kt <<'EOF'
+package com.example.contextdict
+import android.content.Context
+import android.content.SharedPreferences
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
+data class UserDictionary(val id:String,val name:String,val template:String){
+  companion object{ fun new(name:String, template:String)=UserDictionary(UUID.randomUUID().toString(),name,template) }
+}
+class DictionaryStore(ctx:Context){
+  private val prefs: SharedPreferences = ctx.getSharedPreferences("dict_store", Context.MODE_PRIVATE)
+  fun load(): List<UserDictionary> {
+    val json = prefs.getString("items", null) ?: return emptyList()
+    val arr = JSONArray(json); val list = mutableListOf<UserDictionary>()
+    for (i in 0 until arr.length()) {
+      val o = arr.getJSONObject(i)
+      list.add(UserDictionary(o.getString("id"), o.getString("name"), o.getString("template")))
+    }
+    return list
+  }
+  fun save(items: List<UserDictionary>) {
+    val arr = JSONArray()
+    items.forEach { d -> val o = JSONObject(); o.put("id", d.id); o.put("name", d.name); o.put("template", d.template); arr.put(o) }
+    prefs.edit().putString("items", arr.toString()).apply()
+  }
+  fun getDefaultId(): String? = prefs.getString("default_id", null)
+  fun setDefaultId(id:String?) { prefs.edit().putString("default_id", id).apply() }
+  fun resetToDefaults() {
+    val defaults = listOf(
+      UserDictionary.new("Weblio","https://ejje.weblio.jp/content/%s"),
+      UserDictionary.new("英辞郎 on the WEB","https://eow.alc.co.jp/search?q=%s"),
+      UserDictionary.new("Cambridge","https://dictionary.cambridge.org/dictionary/english/%s"),
+      UserDictionary.new("Oxford Learner’s","https://www.oxfordlearnersdictionaries.com/definition/english/%s"),
+      UserDictionary.new("Longman","https://www.ldoceonline.com/dictionary/%s"),
+      UserDictionary.new("Merriam-Webster","https://www.merriam-webster.com/dictionary/%s")
+    )
+    save(defaults); setDefaultId(null)
+  }
+}
+EOF
+          cat > ContextDict/app/src/main/java/com/example/contextdict/DictionaryAdapter.kt <<'EOF'
+package com.example.contextdict
+import android.content.Context
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.TextView
+class DictionaryAdapter(context: Context, val items: MutableList<UserDictionary>) :
+  ArrayAdapter<UserDictionary>(context, 0, items) {
+  override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+    val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.row_dictionary, parent, false)
+    val item = getItem(position)!!
+    view.findViewById<TextView>(R.id.name).text = item.name
+    view.findViewById<TextView>(R.id.template).text = item.template
+    return view
+  }
+}
+EOF
+          # --- ここまで生成 ---
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with: { distribution: 'temurin', java-version: '17' }
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK components
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with: { gradle-version: 8.7 }
+
+      - name: Build Debug APK
+        working-directory: ContextDict
+        run: gradle :app:assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with: { name: ContextDict-APK, path: ContextDict/app/build/outputs/apk/debug/app-debug.apk }
