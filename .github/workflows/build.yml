@@ -18,7 +18,7 @@ jobs:
       - name: Generate project
         run: bash gen.sh
 
-      # ← ここで AndroidX を確実に有効化（ファイルをその場で生成）
+      # AndroidX を確実に有効化
       - name: Ensure gradle.properties
         run: |
           mkdir -p ContextDict
@@ -44,18 +44,20 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;35.0.0" "cmdline-tools;latest"
 
+      # ここで Gradle を PATH に入れる（wrapper なしでも使える）
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
           cache-disabled: true
 
+      # ← wrapper を使わず 'gradle' コマンドで実行
       - name: Build Debug APK (verbose)
-        uses: gradle/gradle-build-action@v3
-        with:
-          build-root-directory: ContextDict
-          # ← 念のためプロパティも併せて渡す
-          arguments: -Pandroid.useAndroidX=true :app:assembleDebug --stacktrace --info --warning-mode all --no-daemon --console=plain
+        working-directory: ContextDict
+        run: |
+          gradle --version
+          gradle -Pandroid.useAndroidX=true :app:assembleDebug \
+            --stacktrace --info --warning-mode all --no-daemon --console=plain
 
       - name: Upload APK artifact
         if: success()
