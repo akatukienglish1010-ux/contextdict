@@ -5,8 +5,6 @@ set -e
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/layout
 mkdir -p ContextDict/app/src/main/res/values
-mkdir -p ContextDict/app/src/main/res/drawable
-mkdir -p ContextDict/app/src/main/res/mipmap-anydpi-v26
 
 # ── settings.gradle ─────────────────────────────────────────────
 cat > ContextDict/settings.gradle <<'EOF'
@@ -83,17 +81,17 @@ cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
 EOF
 
-# ── AndroidManifest.xml（INTERNET + テーマ + icon あり） ───────
+# ── AndroidManifest.xml（INTERNET + テーマ + exported。iconは未指定で安全運用） ──
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- http サイトを開く必要がある場合は application に android:usesCleartextTraffic="true" を追加 -->
 
     <application
         android:label="@string/app_name"
         android:allowBackup="true"
         android:supportsRtl="true"
-        android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.ContextDict">
 
         <activity
@@ -109,14 +107,13 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 </manifest>
 EOF
 
-# ── MainActivity.kt（WebView + コンテクストメニュー「Dongriで検索」） ──
+# ── MainActivity.kt（WebView + コンテクストメニュー「Dongriで検索」 / onActionModeStarted） ──
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.ActionMode
-import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.webkit.WebChromeClient
@@ -150,41 +147,32 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // テキスト選択のツールバーに「Dongriで検索」を追加
-        wv.setCustomSelectionActionModeCallback(object : ActionMode.Callback {
-            private fun ensureItem(menu: Menu) {
-                if (menu.findItem(MENU_DONGRI) == null) {
-                    menu.add(0, MENU_DONGRI, 0, "Dongriで検索")
-                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                }
-            }
-            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                ensureItem(menu); return true
-            }
-            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
-                ensureItem(menu); return true
-            }
-            override fun onDestroyActionMode(mode: ActionMode) {}
+        // 起動ページ（必要なら strings.xml の start_url を変更）
+        wv.loadUrl(getString(R.string.start_url))
+    }
 
-            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                if (item.itemId != MENU_DONGRI) return false
-
+    // ★ WebView のテキスト選択 ActionMode にメニュー項目を追加してハンドル
+    override fun onActionModeStarted(mode: ActionMode) {
+        super.onActionModeStarted(mode)
+        val menu = mode.menu
+        if (menu.findItem(MENU_DONGRI) == null) {
+            val item = menu.add(0, MENU_DONGRI, 0, "Dongriで検索")
+            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+            item.setOnMenuItemClickListener {
                 val js = """
                     (function(){
                       var s = window.getSelection().toString();
                       if(!s){
                         var el = document.activeElement;
                         if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
-                          try {
-                            s = el.value.substring(el.selectionStart||0, el.selectionEnd||0);
-                          } catch(e){}
+                          try { s = el.value.substring(el.selectionStart||0, el.selectionEnd||0); } catch(e){}
                         }
                       }
                       return s;
                     })();
                 """.trimIndent()
 
-                wv.evaluateJavascript(js) { raw ->
+                binding.webview.evaluateJavascript(js) { raw ->
                     val selected = raw
                         ?.trim('"')
                         ?.replace("\\n", " ")
@@ -197,16 +185,13 @@ class MainActivity : AppCompatActivity() {
                     if (selected.isNotBlank()) {
                         val enc = URLEncoder.encode(selected, "UTF-8").replace("+", "%20")
                         val url = "https://home.east-education.jp/dongri/search/all/$enc/HEADWORD/STARTWITH"
-                        wv.loadUrl(url)
+                        binding.webview.loadUrl(url)
                     }
                     mode.finish()
                 }
-                return true
+                true
             }
-        })
-
-        // 起動ページ（必要なら strings.xml の start_url を変更）
-        wv.loadUrl(getString(R.string.start_url))
+        }
     }
 
     override fun onBackPressed() {
@@ -245,41 +230,16 @@ EOF
 cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
     <string name="app_name">ContextDict</string>
+    <!-- 起動時のページ（お好みで変更可） -->
     <string name="start_url">https://ejje.weblio.jp/</string>
 </resources>
 EOF
 
-# ── テーマ（AppCompat / Material3） ───────────────────────────
+# ── テーマ（Material3 / AppCompatActivityで動作） ───────────────
 cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources>
     <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 EOF
 
-# ── アイコン（AAPT用に最低限の adaptive icon 一式を自動生成） ─────
-# 前景（白い丸）
-cat > ContextDict/app/src/main/res/drawable/ic_launcher_foreground.xml <<'EOF'
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M20,54a34,34 0 1,0 68,0a34,34 0 1,0 -68,0"/>
-</vector>
-EOF
-
-# 背景色
-cat > ContextDict/app/src/main/res/values/ic_launcher_background.xml <<'EOF'
-<resources>
-    <color name="ic_launcher_bg">#6200EE</color>
-</resources>
-EOF
-
-# adaptive icon 定義
-cat > ContextDict/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_bg"/>
-    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
-</adaptive-icon>
-EOF
-
-echo "Project generated (WebView + context menu + theme + icons)."
+echo "Project generated (WebView + context menu 'Dongriで検索' via onActionModeStarted)."
