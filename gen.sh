@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# ディレクトリ作成
+# ディレクトリ
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/layout
 mkdir -p ContextDict/app/src/main/res/values
@@ -11,28 +11,21 @@ mkdir -p ContextDict/app/src/main/res/values
 ################################
 cat > ContextDict/settings.gradle <<'EOF'
 pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        google()
-        mavenCentral()
-    }
+    repositories { gradlePluginPortal(); google(); mavenCentral() }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
+    repositories { google(); mavenCentral() }
 }
 rootProject.name = "ContextDict"
 include(":app")
 EOF
 
 ################################
-# ルート build.gradle（最小）
+# ルート build.gradle（空でOK）
 ################################
 cat > ContextDict/build.gradle <<'EOF'
-// empty root build file (pluginsは子モジュールで指定)
+// root empty
 EOF
 
 ################################
@@ -71,22 +64,15 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-        debug {
-            minifyEnabled false
-        }
+        debug { minifyEnabled false }
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-
-    buildFeatures {
-        viewBinding true
-    }
+    kotlinOptions { jvmTarget = '17' }
+    buildFeatures { viewBinding true }
 }
 
 dependencies {
@@ -97,7 +83,7 @@ dependencies {
 EOF
 
 ################################
-# proguard-rules.pro（空でOK）
+# proguard-rules.pro
 ################################
 cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
@@ -105,12 +91,15 @@ EOF
 
 ################################
 # AndroidManifest.xml
-# ※ android:theme を追加（AppCompatActivity用のテーマ）
-# ※ android:icon は付けない（リソース未作成でエラーになるため）
+# ※ INTERNET 権限追加
+# ※ テーマ指定はそのまま
+# ※ HTTPのみのサイトを開く必要があれば application に android:usesCleartextTraffic="true" を追加してください
 ################################
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.contextdict">
+
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="@string/app_name"
@@ -132,30 +121,56 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 EOF
 
 ################################
-# MainActivity.kt（ViewBinding使用）
+# MainActivity.kt（WebView版、戻るボタン対応、進捗表示）
 ################################
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.view.View
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import com.example.contextdict.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.helloText.text = "Hello ContextDict!"
+        val wv = binding.webview
+        wv.settings.javaScriptEnabled = true
+        wv.settings.domStorageEnabled = true
+        wv.webViewClient = WebViewClient() // アプリ内で遷移
+        wv.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                binding.progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
+            }
+        }
+
+        // 起動URL（strings.xmlで変更できます）
+        val startUrl = getString(R.string.start_url)
+        wv.loadUrl(startUrl)
+    }
+
+    override fun onBackPressed() {
+        if (this::binding.isInitialized && binding.webview.canGoBack()) {
+            binding.webview.goBack()
+        } else {
+            super.onBackPressed()
+        }
     }
 }
 EOF
 
 ################################
-# res/layout/activity_main.xml
+# res/layout/activity_main.xml（WebView + progress）
 ################################
 cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
@@ -163,33 +178,39 @@ cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/helloText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Hello ContextDict!"
-        android:textSize="24sp"
-        android:layout_gravity="center" />
+    <WebView
+        android:id="@+id/webview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center"
+        android:visibility="gone" />
 </FrameLayout>
 EOF
 
 ################################
-# res/values/strings.xml
+# res/values/strings.xml（起動URLをここで管理）
 ################################
 cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
     <string name="app_name">ContextDict</string>
+    <!-- 起動時に開くURL。必要ならここを好きな辞書サイトに変更 -->
+    <string name="start_url">https://ejje.weblio.jp/</string>
 </resources>
 EOF
 
 ################################
-# res/values/themes.xml（AppCompat/Material3 テーマ）
+# res/values/themes.xml（テーマ）
 ################################
 cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources>
-    <!-- AppCompatActivity 用のテーマ。Material3 の DayNight・NoActionBar を使用 -->
     <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 EOF
 
-echo "Project generated."
+echo "Project generated (WebView version)."
