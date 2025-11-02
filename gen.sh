@@ -42,6 +42,7 @@ cat > ContextDict/gradle.properties <<'EOF'
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 android.useAndroidX=true
 android.enableJetifier=true
+kotlin.code.style=official
 EOF
 
 ################################
@@ -92,7 +93,6 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 }
 EOF
 
@@ -105,16 +105,18 @@ EOF
 
 ################################
 # AndroidManifest.xml
-# ※ android:icon を付けず、Android 12+ 用に android:exported を明示
+# ※ android:theme を追加（AppCompatActivity用のテーマ）
+# ※ android:icon は付けない（リソース未作成でエラーになるため）
 ################################
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.contextdict">
 
     <application
-        android:label="ContextDict"
+        android:label="@string/app_name"
         android:allowBackup="true"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ContextDict">
 
         <activity
             android:name=".MainActivity"
@@ -130,7 +132,7 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 EOF
 
 ################################
-# MainActivity.kt
+# MainActivity.kt（ViewBinding使用）
 ################################
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
@@ -179,3 +181,15 @@ cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
     <string name="app_name">ContextDict</string>
 </resources>
 EOF
+
+################################
+# res/values/themes.xml（AppCompat/Material3 テーマ）
+################################
+cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
+<resources>
+    <!-- AppCompatActivity 用のテーマ。Material3 の DayNight・NoActionBar を使用 -->
+    <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
+</resources>
+EOF
+
+echo "Project generated."
