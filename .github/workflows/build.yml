@@ -6,41 +6,38 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      # ここでプロジェクトを生成（ContextDict フォルダを作る）
-      - name: Generate project files
-        run: |
-          chmod +x ./gen.sh
-          ./gen.sh
-          echo '--- root ---'; ls -al
-          echo '--- ContextDict ---'; ls -al ContextDict
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install SDK components
-        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      # Gradle を 8.7 に固定（AGP 8.5.2 と互換）
+      - name: Generate project (gen.sh)
+        run: bash gen.sh
+
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.7
+          gradle-version: "8.7"
 
-      - name: Build Debug APK
+      - name: Build Debug APK (verbose)
         run: gradle -p ContextDict :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ContextDict-debug-apk
-          path: ContextDict/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          name: app-debug.apk
+          path: ContextDict/app/build/outputs/apk/debug/app-debug.apk
