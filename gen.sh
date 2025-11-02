@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-# ───── ディレクトリ作成 ─────
+# ── ディレクトリ作成 ─────────────────────────────────────────────
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/layout
 mkdir -p ContextDict/app/src/main/res/values
+mkdir -p ContextDict/app/src/main/res/drawable
+mkdir -p ContextDict/app/src/main/res/mipmap-anydpi-v26
 
-# ───── settings.gradle ─────
+# ── settings.gradle ─────────────────────────────────────────────
 cat > ContextDict/settings.gradle <<'EOF'
 pluginManagement {
     repositories { gradlePluginPortal(); google(); mavenCentral() }
@@ -19,12 +21,12 @@ rootProject.name = "ContextDict"
 include(":app")
 EOF
 
-# ───── ルート build.gradle（空でOK） ─────
+# ── ルート build.gradle（空でOK） ──────────────────────────────
 cat > ContextDict/build.gradle <<'EOF'
 // root empty
 EOF
 
-# ───── gradle.properties ─────
+# ── gradle.properties ──────────────────────────────────────────
 cat > ContextDict/gradle.properties <<'EOF'
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 android.useAndroidX=true
@@ -32,7 +34,7 @@ android.enableJetifier=true
 kotlin.code.style=official
 EOF
 
-# ───── app/build.gradle ─────
+# ── app/build.gradle ───────────────────────────────────────────
 cat > ContextDict/app/build.gradle <<'EOF'
 plugins {
     id 'com.android.application' version '8.5.2'
@@ -49,6 +51,7 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+        vectorDrawables { useSupportLibrary = true }
     }
 
     buildTypes {
@@ -75,15 +78,14 @@ dependencies {
 }
 EOF
 
-# ───── proguard-rules.pro ─────
+# ── proguard-rules.pro ─────────────────────────────────────────
 cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
 EOF
 
-# ───── AndroidManifest.xml（INTERNET + テーマ + exported） ─────
+# ── AndroidManifest.xml（INTERNET + テーマ + icon あり） ───────
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.contextdict">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -91,6 +93,7 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
         android:label="@string/app_name"
         android:allowBackup="true"
         android:supportsRtl="true"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.ContextDict">
 
         <activity
@@ -106,7 +109,7 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 </manifest>
 EOF
 
-# ───── MainActivity.kt（WebView + 選択メニューに「Dongriで検索」追加） ─────
+# ── MainActivity.kt（WebView + コンテクストメニュー「Dongriで検索」） ──
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
@@ -147,7 +150,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 選択ツールバーに「Dongriで検索」を追加
+        // テキスト選択のツールバーに「Dongriで検索」を追加
         wv.setCustomSelectionActionModeCallback(object : ActionMode.Callback {
             private fun ensureItem(menu: Menu) {
                 if (menu.findItem(MENU_DONGRI) == null) {
@@ -155,7 +158,6 @@ class MainActivity : AppCompatActivity() {
                         .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
                 }
             }
-
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                 ensureItem(menu); return true
             }
@@ -217,7 +219,7 @@ class MainActivity : AppCompatActivity() {
 }
 EOF
 
-# ───── レイアウト（WebView＋中央にローディング） ─────
+# ── レイアウト（WebView＋中央ローディング） ────────────────────
 cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -239,20 +241,45 @@ cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 </FrameLayout>
 EOF
 
-# ───── 文字列リソース（起動URL） ─────
+# ── 文字列リソース（起動URL） ─────────────────────────────────
 cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
     <string name="app_name">ContextDict</string>
-    <!-- 起動時のページ（お好みで変更可） -->
     <string name="start_url">https://ejje.weblio.jp/</string>
 </resources>
 EOF
 
-# ───── テーマ（AppCompat 用） ─────
+# ── テーマ（AppCompat / Material3） ───────────────────────────
 cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources>
     <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 EOF
 
-echo "Project generated (WebView + context menu 'Dongriで検索')."
+# ── アイコン（AAPT用に最低限の adaptive icon 一式を自動生成） ─────
+# 前景（白い丸）
+cat > ContextDict/app/src/main/res/drawable/ic_launcher_foreground.xml <<'EOF'
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M20,54a34,34 0 1,0 68,0a34,34 0 1,0 -68,0"/>
+</vector>
+EOF
+
+# 背景色
+cat > ContextDict/app/src/main/res/values/ic_launcher_background.xml <<'EOF'
+<resources>
+    <color name="ic_launcher_bg">#6200EE</color>
+</resources>
+EOF
+
+# adaptive icon 定義
+cat > ContextDict/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_bg"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+</adaptive-icon>
+EOF
+
+echo "Project generated (WebView + context menu + theme + icons)."
