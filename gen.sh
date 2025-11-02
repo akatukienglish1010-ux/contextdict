@@ -1,30 +1,28 @@
 #!/usr/bin/env bash
 set -e
 
-# ── ディレクトリ作成 ─────────────────────────────────────────────
+# ── ディレクトリ ─────────────────────────────────────────────
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/layout
 mkdir -p ContextDict/app/src/main/res/values
 
-# ── settings.gradle ─────────────────────────────────────────────
+# ── settings.gradle ───────────────────────────────────────────
 cat > ContextDict/settings.gradle <<'EOF'
-pluginManagement {
-    repositories { gradlePluginPortal(); google(); mavenCentral() }
-}
+pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories { google(); mavenCentral() }
 }
 rootProject.name = "ContextDict"
 include(":app")
 EOF
 
-# ── ルート build.gradle（空でOK） ──────────────────────────────
+# ── root build.gradle（空でOK） ───────────────────────────────
 cat > ContextDict/build.gradle <<'EOF'
 // root empty
 EOF
 
-# ── gradle.properties ──────────────────────────────────────────
+# ── gradle.properties ─────────────────────────────────────────
 cat > ContextDict/gradle.properties <<'EOF'
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 android.useAndroidX=true
@@ -32,214 +30,210 @@ android.enableJetifier=true
 kotlin.code.style=official
 EOF
 
-# ── app/build.gradle ───────────────────────────────────────────
+# ── app/build.gradle ──────────────────────────────────────────
 cat > ContextDict/app/build.gradle <<'EOF'
 plugins {
-    id 'com.android.application' version '8.5.2'
-    id 'org.jetbrains.kotlin.android' version '1.9.24'
+  id 'com.android.application' version '8.5.2'
+  id 'org.jetbrains.kotlin.android' version '1.9.24'
 }
-
 android {
-    namespace 'com.example.contextdict'
-    compileSdk 34
-
-    defaultConfig {
-        applicationId "com.example.contextdict"
-        minSdk 23
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-        vectorDrawables { useSupportLibrary = true }
+  namespace 'com.example.contextdict'
+  compileSdk 34
+  defaultConfig {
+    applicationId "com.example.contextdict"
+    minSdk 23
+    targetSdk 34
+    versionCode 1
+    versionName "1.0"
+    vectorDrawables { useSupportLibrary = true }
+  }
+  buildTypes {
+    release {
+      minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
     }
-
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-        debug { minifyEnabled false }
-    }
-
-    buildFeatures { viewBinding true }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-    kotlinOptions { jvmTarget = '17' }
+    debug { minifyEnabled false }
+  }
+  buildFeatures { viewBinding true }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions { jvmTarget = '17' }
 }
-
 dependencies {
-    implementation 'androidx.core:core-ktx:1.13.1'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'com.google.android.material:material:1.12.0'
+  implementation 'androidx.core:core-ktx:1.13.1'
+  implementation 'androidx.appcompat:appcompat:1.7.0'
+  implementation 'com.google.android.material:material:1.12.0'
 }
 EOF
 
-# ── proguard-rules.pro ─────────────────────────────────────────
+# ── proguard-rules.pro ────────────────────────────────────────
 cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
 EOF
 
-# ── AndroidManifest.xml（INTERNET + テーマ + exported。iconは未指定で安全運用） ──
+# ── AndroidManifest.xml ───────────────────────────────────────
+# ※ ACTION_PROCESS_TEXT を宣言 → 文字選択メニューに「Dongriで検索」が出ます
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <!-- http サイトを開く必要がある場合は application に android:usesCleartextTraffic="true" を追加 -->
+  <uses-permission android:name="android.permission.INTERNET" />
 
-    <application
-        android:label="@string/app_name"
-        android:allowBackup="true"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.ContextDict">
+  <application
+      android:label="@string/app_name"
+      android:allowBackup="true"
+      android:supportsRtl="true"
+      android:theme="@style/Theme.ContextDict">
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+    <activity
+        android:name=".MainActivity"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
 
-    </application>
+    <!-- ▼ 選択メニューに出す「Dongriで検索」 ▼ -->
+    <activity
+        android:name=".ProcessTextActivity"
+        android:exported="true"
+        android:label="Dongriで検索">
+      <intent-filter>
+        <action android:name="android.intent.action.PROCESS_TEXT" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+      </intent-filter>
+    </activity>
+    <!-- ▲ ここまで ▲ -->
+
+  </application>
 </manifest>
 EOF
 
-# ── MainActivity.kt（WebView + コンテクストメニュー「Dongriで検索」 / onActionModeStarted） ──
+# ── MainActivity.kt（ACTION_VIEW/EXTRA open_url に対応） ────────
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.view.ActionMode
-import android.view.MenuItem
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import com.example.contextdict.databinding.ActivityMainBinding
-import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
+  private lateinit var binding: ActivityMainBinding
 
-    companion object {
-        private const val MENU_DONGRI = 1001
+  @SuppressLint("SetJavaScriptEnabled")
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    binding = ActivityMainBinding.inflate(layoutInflater)
+    setContentView(binding.root)
+
+    val wv = binding.webview
+    wv.settings.javaScriptEnabled = true
+    wv.settings.domStorageEnabled = true
+    wv.webViewClient = WebViewClient()
+    wv.webChromeClient = object : WebChromeClient() {
+      override fun onProgressChanged(view: WebView?, newProgress: Int) {
+        binding.progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
+      }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+    handleIntent(intent)  // 起動時
+  }
 
-        val wv = binding.webview
-        wv.settings.javaScriptEnabled = true
-        wv.settings.domStorageEnabled = true
-        wv.webViewClient = WebViewClient()
-        wv.webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                binding.progressBar.visibility =
-                    if (newProgress in 1..99) View.VISIBLE else View.GONE
-            }
-        }
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    if (intent != null) handleIntent(intent)
+  }
 
-        // 起動ページ（必要なら strings.xml の start_url を変更）
-        wv.loadUrl(getString(R.string.start_url))
+  private fun handleIntent(i: Intent) {
+    val openUrl = i.getStringExtra("open_url") ?: i.dataString
+    val url = openUrl ?: getString(R.string.start_url)
+    binding.webview.loadUrl(url)
+  }
+
+  override fun onBackPressed() {
+    if (this::binding.isInitialized && binding.webview.canGoBack()) {
+      binding.webview.goBack()
+    } else {
+      super.onBackPressed()
     }
-
-    // ★ WebView のテキスト選択 ActionMode にメニュー項目を追加してハンドル
-    override fun onActionModeStarted(mode: ActionMode) {
-        super.onActionModeStarted(mode)
-        val menu = mode.menu
-        if (menu.findItem(MENU_DONGRI) == null) {
-            val item = menu.add(0, MENU_DONGRI, 0, "Dongriで検索")
-            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-            item.setOnMenuItemClickListener {
-                val js = """
-                    (function(){
-                      var s = window.getSelection().toString();
-                      if(!s){
-                        var el = document.activeElement;
-                        if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
-                          try { s = el.value.substring(el.selectionStart||0, el.selectionEnd||0); } catch(e){}
-                        }
-                      }
-                      return s;
-                    })();
-                """.trimIndent()
-
-                binding.webview.evaluateJavascript(js) { raw ->
-                    val selected = raw
-                        ?.trim('"')
-                        ?.replace("\\n", " ")
-                        ?.replace("\\t", " ")
-                        ?.replace("\\u3000", " ")
-                        ?.replace("\\\"", "\"")
-                        ?.trim()
-                        ?: ""
-
-                    if (selected.isNotBlank()) {
-                        val enc = URLEncoder.encode(selected, "UTF-8").replace("+", "%20")
-                        val url = "https://home.east-education.jp/dongri/search/all/$enc/HEADWORD/STARTWITH"
-                        binding.webview.loadUrl(url)
-                    }
-                    mode.finish()
-                }
-                true
-            }
-        }
-    }
-
-    override fun onBackPressed() {
-        if (this::binding.isInitialized && binding.webview.canGoBack()) {
-            binding.webview.goBack()
-        } else {
-            super.onBackPressed()
-        }
-    }
+  }
 }
 EOF
 
-# ── レイアウト（WebView＋中央ローディング） ────────────────────
+# ── ProcessTextActivity.kt（選択文字を受け取り→MainActivityで表示） ──
+cat > ContextDict/app/src/main/java/com/example/contextdict/ProcessTextActivity.kt <<'EOF'
+package com.example.contextdict
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import java.net.URLEncoder
+
+class ProcessTextActivity : AppCompatActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    val selected = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim()
+    if (!selected.isNullOrEmpty()) {
+      val enc = URLEncoder.encode(selected, "UTF-8").replace("+", "%20")
+      val url = "https://home.east-education.jp/dongri/search/all/$enc/HEADWORD/STARTWITH"
+      val i = Intent(this, MainActivity::class.java).apply {
+        putExtra("open_url", url)
+        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      }
+      startActivity(i)
+    }
+    finish()
+  }
+}
+EOF
+
+# ── layout/activity_main.xml ───────────────────────────────────
 cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent">
+
+  <WebView
+    android:id="@+id/webview"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent" />
 
-    <WebView
-        android:id="@+id/webview"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <ProgressBar
-        android:id="@+id/progressBar"
-        style="?android:attr/progressBarStyleLarge"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_gravity="center"
-        android:visibility="gone" />
+  <ProgressBar
+    android:id="@+id/progressBar"
+    style="?android:attr/progressBarStyleLarge"
+    android:layout_width="56dp"
+    android:layout_height="56dp"
+    android:layout_gravity="center"
+    android:visibility="gone" />
 </FrameLayout>
 EOF
 
-# ── 文字列リソース（起動URL） ─────────────────────────────────
+# ── values/strings.xml ─────────────────────────────────────────
 cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
-    <string name="app_name">ContextDict</string>
-    <!-- 起動時のページ（お好みで変更可） -->
-    <string name="start_url">https://ejje.weblio.jp/</string>
+  <string name="app_name">ContextDict</string>
+  <!-- 起動時のページ（お好みで変更可） -->
+  <string name="start_url">https://ejje.weblio.jp/</string>
 </resources>
 EOF
 
-# ── テーマ（Material3 / AppCompatActivityで動作） ───────────────
+# ── values/themes.xml ──────────────────────────────────────────
 cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources>
-    <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
+  <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 EOF
 
-echo "Project generated (WebView + context menu 'Dongriで検索' via onActionModeStarted)."
+echo "Project generated (WebView + ACTION_PROCESS_TEXT 'Dongriで検索')."
