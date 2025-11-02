@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 一旦まっさらに作る
+# まっさらに作り直す
 rm -rf ContextDict
 mkdir -p ContextDict/app/src/main/java/com/example/contextdict
 mkdir -p ContextDict/app/src/main/res/{layout,values}
@@ -21,14 +21,14 @@ EOF
 cat > ContextDict/build.gradle <<'EOF'
 EOF
 
-# gradle.properties（AndroidX 有効化）
+# gradle.properties（AndroidX不要だが将来のためにONでも無害）
 cat > ContextDict/gradle.properties <<'EOF'
 android.useAndroidX=true
 kotlin.code.style=official
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 EOF
 
-# app/build.gradle
+# app/build.gradle（依存をKotlin標準のみに）
 cat > ContextDict/app/build.gradle <<'EOF'
 plugins {
     id 'com.android.application' version '8.5.2'
@@ -37,7 +37,6 @@ plugins {
 android {
     namespace 'com.example.contextdict'
     compileSdk 34
-
     defaultConfig {
         applicationId "com.example.contextdict"
         minSdk 23
@@ -45,7 +44,6 @@ android {
         versionCode 1
         versionName "1.0"
     }
-
     buildTypes {
         release {
             minifyEnabled false
@@ -53,25 +51,18 @@ android {
         }
         debug { minifyEnabled false }
     }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = '17' }
-    buildFeatures { viewBinding true }
 }
-
 dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
-    implementation 'androidx.core:core-ktx:1.13.1'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'com.google.android.material:material:1.12.0'
-    # 必要なら後で追加： implementation 'androidx.browser:browser:1.8.0'
 }
 EOF
 
-# AndroidManifest
+# AndroidManifest（プラットフォーム標準テーマを使用＝外部依存なし）
 cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -79,7 +70,7 @@ cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
         android:label="@string/app_name"
         android:allowBackup="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -113,14 +104,14 @@ cat > ContextDict/app/src/main/res/layout/activity_main.xml <<'EOF'
 </LinearLayout>
 EOF
 
-# MainActivity.kt
+# 最小コード（AppCompatを使わない）
 cat > ContextDict/app/src/main/java/com/example/contextdict/MainActivity.kt <<'EOF'
 package com.example.contextdict
 
+import android.app.Activity
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
