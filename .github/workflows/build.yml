@@ -9,20 +9,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # プロジェクト一式を生成
+      # ① プロジェクトをその場で生成（ZIP不要）
       - name: Create project files
+        shell: bash
         run: |
           set -e
           mkdir -p ContextDict/app/src/main/java/com/example/contextdict
-          mkdir -p ContextDict/app/src/main/res/values
-          mkdir -p ContextDict/app/src/main/res/layout
-          # --- ここから各ファイルを作成（長いので折りたたみ） ---
+          mkdir -p ContextDict/app/src/main/res/{values,layout}
           cat > ContextDict/settings.gradle <<'EOF'
 pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }
-dependencyResolutionManagement {
-  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-  repositories { google(); mavenCentral() }
-}
+dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
 rootProject.name = "ContextDict"
 include(":app")
 EOF
@@ -124,7 +120,7 @@ class ProcessTextActivity : AppCompatActivity() {
     val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim().orEmpty()
     val store = DictionaryStore(this)
     val dicts = store.load()
-    if (dicts.isEmpty()) { store.resetToDefaults() }
+    if (dicts.isEmpty()) store.resetToDefaults()
     val finalDicts = store.load()
     val defaultId = store.getDefaultId()
     val defaultDict = finalDicts.firstOrNull { it.id == defaultId }
@@ -239,7 +235,7 @@ class DictionaryStore(ctx:Context){
       UserDictionary.new("Weblio","https://ejje.weblio.jp/content/%s"),
       UserDictionary.new("英辞郎 on the WEB","https://eow.alc.co.jp/search?q=%s"),
       UserDictionary.new("Cambridge","https://dictionary.cambridge.org/dictionary/english/%s"),
-      UserDictionary.new("Oxford Learner’s","https://www.oxfordlearnersdictionaries.com/definition/english/%s"),
+      UserDictionary.new("Oxford Learner's","https://www.oxfordlearnersdictionaries.com/definition/english/%s"),
       UserDictionary.new("Longman","https://www.ldoceonline.com/dictionary/%s"),
       UserDictionary.new("Merriam-Webster","https://www.merriam-webster.com/dictionary/%s")
     )
@@ -266,8 +262,8 @@ class DictionaryAdapter(context: Context, val items: MutableList<UserDictionary>
   }
 }
 EOF
-          # --- ここまで生成 ---
 
+      # ② Java & Android SDK
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '17' }
@@ -280,14 +276,12 @@ EOF
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with: { gradle-version: 8.7 }
-
+      # ③ Gradle でビルド
       - name: Build Debug APK
-        working-directory: ContextDict
-        run: gradle :app:assembleDebug
+        uses: gradle/gradle-build-action@v3
+        with: { build-root: ContextDict, arguments: :app:assembleDebug }
 
+      # ④ 成果物としてAPKを出す
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with: { name: ContextDict-APK, path: ContextDict/app/build/outputs/apk/debug/app-debug.apk }
