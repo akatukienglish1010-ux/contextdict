@@ -9,29 +9,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ① プロジェクトをその場で生成（ZIP不要）
+      # ① プロジェクトを生成（ZIP不要）
       - name: Create project files
         shell: bash
         run: |
           set -e
           mkdir -p ContextDict/app/src/main/java/com/example/contextdict
           mkdir -p ContextDict/app/src/main/res/{values,layout}
+
           cat > ContextDict/settings.gradle <<'EOF'
 pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }
 dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
 rootProject.name = "ContextDict"
 include(":app")
 EOF
+
           cat > ContextDict/build.gradle <<'EOF'
 buildscript { repositories { google(); mavenCentral() } }
-plugins { id 'com.android.application' version '8.5.2' apply false; id 'org.jetbrains.kotlin.android' version '1.9.24' apply false }
+plugins {
+  id 'com.android.application' version '8.5.2' apply false
+  id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
+}
 EOF
+
           cat > ContextDict/app/build.gradle <<'EOF'
 plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
 android {
-  namespace 'com.example.contextdict'; compileSdk 34
-  defaultConfig { applicationId "com.example.contextdict"; minSdk 23; targetSdk 34; versionCode 1; versionName "1.0"; vectorDrawables { useSupportLibrary true } }
-  buildTypes { release { minifyEnabled false; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' } debug { minifyEnabled false } }
+  namespace 'com.example.contextdict'
+  compileSdk 34
+  defaultConfig {
+    applicationId "com.example.contextdict"
+    minSdk 23
+    targetSdk 34
+    versionCode 1
+    versionName "1.0"
+    vectorDrawables { useSupportLibrary true }
+  }
+  buildTypes {
+    release { minifyEnabled false; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' }
+    debug { minifyEnabled false }
+  }
   compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
   kotlinOptions { jvmTarget = '17' }
   buildFeatures { viewBinding true }
@@ -43,9 +60,11 @@ dependencies {
   implementation 'androidx.browser:browser:1.8.0'
 }
 EOF
+
           cat > ContextDict/app/proguard-rules.pro <<'EOF'
 # no rules
 EOF
+
           cat > ContextDict/app/src/main/AndroidManifest.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.contextdict">
@@ -61,6 +80,7 @@ EOF
   </application>
 </manifest>
 EOF
+
           cat > ContextDict/app/src/main/res/values/strings.xml <<'EOF'
 <resources>
   <string name="app_name">ContextDict</string>
@@ -79,6 +99,7 @@ EOF
   <string name="dialog_manage">管理…</string>
 </resources>
 EOF
+
           cat > ContextDict/app/src/main/res/values/themes.xml <<'EOF'
 <resources xmlns:tools="http://schemas.android.com/tools">
   <style name="Theme.ContextDict" parent="Theme.Material3.DayNight.NoActionBar">
@@ -86,6 +107,7 @@ EOF
   </style>
 </resources>
 EOF
+
           cat > ContextDict/app/src/main/res/layout/activity_edit_dictionaries.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="16dp">
@@ -98,6 +120,7 @@ EOF
   <ListView android:id="@+id/listView" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:dividerHeight="1dp"/>
 </LinearLayout>
 EOF
+
           cat > ContextDict/app/src/main/res/layout/row_dictionary.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:orientation="vertical">
@@ -105,6 +128,7 @@ EOF
   <TextView android:id="@+id/template" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp"/>
 </LinearLayout>
 EOF
+
           cat > ContextDict/app/src/main/java/com/example/contextdict/ProcessTextActivity.kt <<'EOF'
 package com.example.contextdict
 import android.content.Intent
@@ -133,7 +157,8 @@ class ProcessTextActivity : AppCompatActivity() {
         else openDictionary(finalDicts[which], text)
         finish()
       }
-      .setOnCancelListener { finish() }.show()
+      .setOnCancelListener { finish() }
+      .show()
   }
   private fun openDictionary(dict: UserDictionary, text: String) {
     val encoded = URLEncoder.encode(text.ifBlank { "" }, "UTF-8")
@@ -142,6 +167,7 @@ class ProcessTextActivity : AppCompatActivity() {
   }
 }
 EOF
+
           cat > ContextDict/app/src/main/java/com/example/contextdict/EditDictionariesActivity.kt <<'EOF'
 package com.example.contextdict
 import android.os.Bundle
@@ -202,6 +228,7 @@ class EditDictionariesActivity : AppCompatActivity() {
   }
 }
 EOF
+
           cat > ContextDict/app/src/main/java/com/example/contextdict/DictionaryStore.kt <<'EOF'
 package com.example.contextdict
 import android.content.Context
@@ -243,6 +270,7 @@ class DictionaryStore(ctx:Context){
   }
 }
 EOF
+
           cat > ContextDict/app/src/main/java/com/example/contextdict/DictionaryAdapter.kt <<'EOF'
 package com.example.contextdict
 import android.content.Context
@@ -266,7 +294,9 @@ EOF
       # ② Java & Android SDK
       - name: Set up Java 17
         uses: actions/setup-java@v4
-        with: { distribution: 'temurin', java-version: '17' }
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -276,12 +306,19 @@ EOF
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
 
-      # ③ Gradle でビルド
-      - name: Build Debug APK
-        uses: gradle/gradle-build-action@v3
-        with: { build-root: ContextDict, arguments: :app:assembleDebug }
+      # ③ Gradle を用意してビルド
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
 
-      # ④ 成果物としてAPKを出す
+      - name: Build Debug APK
+        working-directory: ContextDict
+        run: gradle :app:assembleDebug
+
+      # ④ APK を成果物に
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
-        with: { name: ContextDict-APK, path: ContextDict/app/build/outputs/apk/debug/app-debug.apk }
+        with:
+          name: ContextDict-APK
+          path: ContextDict/app/build/outputs/apk/debug/app-debug.apk
