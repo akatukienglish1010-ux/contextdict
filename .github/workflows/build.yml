@@ -27,7 +27,6 @@ jobs:
       - name: Generate project (gen.sh)
         run: bash gen.sh
 
-      # Gradle 8.7 に固定（AGP 8.5.2 と相性良し）
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
